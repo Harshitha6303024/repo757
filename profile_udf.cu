@@ -1,7 +1,7 @@
 #include <iostream>
-#include <stdint.h>
+#include <cstdlib>
+#include <ctime>
 #include "run_udf.cuh"
-#include <cuda.h>
 
 __global__ void profile_udf_kernel(int* input, int* output, int N) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -15,8 +15,11 @@ int main() {
     int h_input[N];
     int h_output[N];
 
+    srand(time(NULL)); // Seed RNG
+
+    // Fill input with random values to induce divergence
     for (int i = 0; i < N; ++i)
-        h_input[i] = i;
+        h_input[i] = rand() % 1000 + 100;  // Loop count range: [100, 1099]
 
     int* d_input;
     int* d_output;
@@ -29,7 +32,8 @@ int main() {
     cudaMemcpy(h_output, d_output, sizeof(int) * N, cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < N; ++i)
-        std::cout << "Thread " << i << " output: " << h_output[i] << std::endl;
+        std::cout << "Thread " << i << " (input=" << h_input[i]
+                  << ") output: " << h_output[i] << std::endl;
 
     cudaFree(d_input);
     cudaFree(d_output);
