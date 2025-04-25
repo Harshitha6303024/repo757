@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>      // For std::setw and std::setprecision
 #include <cstdlib>
 #include <ctime>
 #include <stdint.h>
@@ -50,24 +51,25 @@ int main() {
     cudaMemcpy(h_active_cycles, d_active_cycles, sizeof(int) * N, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_total_cycles, d_total_cycles, sizeof(uint64_t) * N, cudaMemcpyDeviceToHost);
 
-    // Find max active_cycles to normalize work values
+    // Find max active_cycles to normalize work scores
     int max_active = 0;
     for (int i = 0; i < N; ++i) {
         if (h_active_cycles[i] > max_active)
             max_active = h_active_cycles[i];
     }
 
-    std::cout << "\n=== Per-Thread Execution Report (with Work Value) ===\n";
+    std::cout << "\n=== Per-Thread Execution Report (Integer Work Score) ===\n";
     for (int i = 0; i < N; ++i) {
+        int work_value = h_active_cycles[i]; // Raw active cycles
+        int work_score = (int)(((double)work_value / max_active) * 100.0);  // Score from 0–100
         double utilization = (double)h_active_cycles[i] / h_total_cycles[i] * 100.0;
-        double normalized_work = (double)h_active_cycles[i] / max_active;
 
-        std::cout << "Thread " << i
-                  << " | Input: " << h_input[i]
-                  << " | Output: " << h_output[i]
-                  << " | Work Value (Active Cycles): " << h_active_cycles[i]
-                  << " | Normalized Work: " << normalized_work
-                  << " | Utilization: " << utilization << " %\n";
+        std::cout << "Thread " << std::setw(2) << i
+                  << " | Input: " << std::setw(4) << h_input[i]
+                  << " | Output: " << std::setw(9) << h_output[i]
+                  << " | Work Value: " << std::setw(4) << work_value
+                  << " | Work Score: " << std::setw(3) << work_score << "/100"
+                  << " | Utilization: " << std::fixed << std::setprecision(2) << utilization << " %\n";
     }
 
     cudaFree(d_input);
