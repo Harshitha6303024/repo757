@@ -26,7 +26,7 @@ __global__ void profile_udf_kernel(
 }
 
 int main() {
-    const int N = 64;
+    const int N = 32; // one warp
     int h_input[N], h_output[N], h_active_cycles[N];
     uint64_t h_total_cycles[N];
 
