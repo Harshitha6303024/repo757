@@ -31,7 +31,7 @@ int main() {
 
     srand(time(NULL));
     for (int i = 0; i < N; ++i)
-        h_input[i] = rand() % 1000 + 100;
+        h_input[i] = rand() % 1000 + 100;  // Induce divergence
 
     int *d_input, *d_output, *d_active_cycles;
     uint64_t* d_total_cycles;
@@ -52,13 +52,19 @@ int main() {
 
     std::cout << "\n=== Per-Thread Execution Report ===\n";
     for (int i = 0; i < N; ++i) {
+        double utilization = (double)h_active_cycles[i] / h_total_cycles[i] * 100.0;
+
         std::cout << "Thread " << i
                   << " | Input: " << h_input[i]
                   << " | Output: " << h_output[i]
                   << " | Active Cycles: " << h_active_cycles[i]
-                  << " | Total Cycles: " << h_total_cycles[i] << "\n";
+                  << " | Total Cycles: " << h_total_cycles[i]
+                  << " | Utilization: " << utilization << " %\n";
     }
 
-    cudaFree(d_input); cudaFree(d_output); cudaFree(d_active_cycles); cudaFree(d_total_cycles);
+    cudaFree(d_input);
+    cudaFree(d_output);
+    cudaFree(d_active_cycles);
+    cudaFree(d_total_cycles);
     return 0;
 }
