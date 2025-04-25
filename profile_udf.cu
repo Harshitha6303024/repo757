@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <stdint.h>
-#include "run_udf.cuh"
+#include "run_udf_divergent.cuh"
 
 #define WARP_SIZE 32
 
@@ -11,12 +11,11 @@ __global__ void profile_udf_kernel(int* input, int* output, uint64_t* timing, in
     if (tid >= N) return;
 
     uint64_t start = clock64();
-
     int sum, count;
-    run_udf(input[tid], &sum, &count);  // Divergence-heavy workload
+    run_udf(input[tid], &sum, &count);
     output[tid] = sum;
-
     uint64_t end = clock64();
+
     timing[tid] = end - start;
 }
 
@@ -27,12 +26,10 @@ int main() {
     uint64_t h_timing[N];
 
     srand(time(NULL));
-
     for (int i = 0; i < N; ++i)
-        h_input[i] = rand() % 1000 + 100;
+        h_input[i] = rand() % 1000 + 100;  // Random input = divergence
 
-    int* d_input;
-    int* d_output;
+    int *d_input, *d_output;
     uint64_t* d_timing;
     cudaMalloc(&d_input, sizeof(int) * N);
     cudaMalloc(&d_output, sizeof(int) * N);
@@ -46,30 +43,11 @@ int main() {
     cudaMemcpy(h_output, d_output, sizeof(int) * N, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_timing, d_timing, sizeof(uint64_t) * N, cudaMemcpyDeviceToHost);
 
-    std::cout << "=== Per-Thread Execution Times ===\n";
-    for (int i = 0; i < N; ++i) {
-        std::cout << "Thread " << i
-                  << " | Input: " << h_input[i]
-                  << " | Output: " << h_output[i]
+    std::cout << "\n=== Divergent Execution Times ===\n";
+    for (int i = 0; i < N; ++i)
+        std::cout << "Thread " << i << " | Input: " << h_input[i]
                   << " | Time: " << h_timing[i] << " cycles\n";
-    }
 
-    std::cout << "\n=== Per-Warp Grouped Timing ===\n";
-    for (int warp_id = 0; warp_id < N / WARP_SIZE; ++warp_id) {
-        std::cout << "Warp " << warp_id << ":\n";
-        for (int i = 0; i < WARP_SIZE; ++i) {
-            int tid = warp_id * WARP_SIZE + i;
-            std::cout << "  Thread " << tid
-                      << " | Input: " << h_input[tid]
-                      << " | Output: " << h_output[tid]
-                      << " | Time: " << h_timing[tid] << " cycles\n";
-        }
-        std::cout << std::endl;
-    }
-
-    cudaFree(d_input);
-    cudaFree(d_output);
-    cudaFree(d_timing);
-
+    cudaFree(d_input); cudaFree(d_output); cudaFree(d_timing);
     return 0;
 }
