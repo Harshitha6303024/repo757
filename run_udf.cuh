@@ -1,19 +1,20 @@
-#ifndef RUN_UDF_CUH
-#define RUN_UDF_CUH
+#ifndef RUN_UDF_H
+#define RUN_UDF_H
 
-#include <cuda_runtime.h>
-#include <stdio.h>
+// Uniform workload: No control-flow or memory divergence
+__device__ void run_udf(int input, int* out_sum, int* out_count) {
+    int sum_result = 0;
+    int loop_count = 0;
 
-// Divergent UDF based on random input loop count
-__device__ int run_udf(int input) {
-    float x = 1.0f;
-
-    for (int i = 0; i < input; ++i) {
-        x += i * 0.0001f; // Much smaller growth to avoid overflow
+    int i = 0;
+    while (i < input) {
+        sum_result += i * i;
+        loop_count++;
+        i++;
     }
 
-    // Convert to int safely (x won't grow explosively now)
-    return static_cast<int>(x * 1000.0f);
+    *out_sum = sum_result;
+    *out_count = loop_count;
 }
 
 #endif

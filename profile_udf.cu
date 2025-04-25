@@ -4,14 +4,19 @@
 #include <stdint.h>
 #include "run_udf.cuh"
 
+#define WARP_SIZE 32
+
 __global__ void profile_udf_kernel(int* input, int* output, uint64_t* timing, int N) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= N) return;
 
-    uint64_t start = clock64();  // Start timer
-    output[tid] = run_udf(input[tid]);
-    uint64_t end = clock64();    // End timer
+    uint64_t start = clock64();
 
+    int sum, count;
+    run_udf(input[tid], &sum, &count);  // Divergence-heavy workload
+    output[tid] = sum;
+
+    uint64_t end = clock64();
     timing[tid] = end - start;
 }
 
@@ -21,11 +26,10 @@ int main() {
     int h_output[N];
     uint64_t h_timing[N];
 
-    srand(time(NULL)); // Seed RNG
+    srand(time(NULL));
 
-    // Fill input with random values to induce divergence
     for (int i = 0; i < N; ++i)
-        h_input[i] = rand() % 1000 + 100;  // Loop count range: [100, 1099]
+        h_input[i] = rand() % 1000 + 100;
 
     int* d_input;
     int* d_output;
@@ -37,14 +41,31 @@ int main() {
     cudaMemcpy(d_input, h_input, sizeof(int) * N, cudaMemcpyHostToDevice);
 
     profile_udf_kernel<<<1, N>>>(d_input, d_output, d_timing, N);
+    cudaDeviceSynchronize();
+
     cudaMemcpy(h_output, d_output, sizeof(int) * N, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_timing, d_timing, sizeof(uint64_t) * N, cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < N; ++i)
+    std::cout << "=== Per-Thread Execution Times ===\n";
+    for (int i = 0; i < N; ++i) {
         std::cout << "Thread " << i
-                  << " (input=" << h_input[i]
-                  << ") output: " << h_output[i]
-                  << " | time: " << h_timing[i] << " cycles" << std::endl;
+                  << " | Input: " << h_input[i]
+                  << " | Output: " << h_output[i]
+                  << " | Time: " << h_timing[i] << " cycles\n";
+    }
+
+    std::cout << "\n=== Per-Warp Grouped Timing ===\n";
+    for (int warp_id = 0; warp_id < N / WARP_SIZE; ++warp_id) {
+        std::cout << "Warp " << warp_id << ":\n";
+        for (int i = 0; i < WARP_SIZE; ++i) {
+            int tid = warp_id * WARP_SIZE + i;
+            std::cout << "  Thread " << tid
+                      << " | Input: " << h_input[tid]
+                      << " | Output: " << h_output[tid]
+                      << " | Time: " << h_timing[tid] << " cycles\n";
+        }
+        std::cout << std::endl;
+    }
 
     cudaFree(d_input);
     cudaFree(d_output);
