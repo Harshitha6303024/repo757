@@ -1,5 +1,5 @@
-#ifndef RUN_UDF_DIVERGENT_H
-#define RUN_UDF_DIVERGENT_H
+#ifndef RUN_UDF_H
+#define RUN_UDF_H
 
 // Divergence-heavy: input-dependent branching and nested loops
 __device__ void run_udf(int input, int* out_sum, int* out_count) {
