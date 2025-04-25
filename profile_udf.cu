@@ -50,15 +50,23 @@ int main() {
     cudaMemcpy(h_active_cycles, d_active_cycles, sizeof(int) * N, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_total_cycles, d_total_cycles, sizeof(uint64_t) * N, cudaMemcpyDeviceToHost);
 
-    std::cout << "\n=== Per-Thread Execution Report ===\n";
+    // Find max active_cycles to normalize work values
+    int max_active = 0;
+    for (int i = 0; i < N; ++i) {
+        if (h_active_cycles[i] > max_active)
+            max_active = h_active_cycles[i];
+    }
+
+    std::cout << "\n=== Per-Thread Execution Report (with Work Value) ===\n";
     for (int i = 0; i < N; ++i) {
         double utilization = (double)h_active_cycles[i] / h_total_cycles[i] * 100.0;
+        double normalized_work = (double)h_active_cycles[i] / max_active;
 
         std::cout << "Thread " << i
                   << " | Input: " << h_input[i]
                   << " | Output: " << h_output[i]
-                  << " | Active Cycles: " << h_active_cycles[i]
-                  << " | Total Cycles: " << h_total_cycles[i]
+                  << " | Work Value (Active Cycles): " << h_active_cycles[i]
+                  << " | Normalized Work: " << normalized_work
                   << " | Utilization: " << utilization << " %\n";
     }
 
