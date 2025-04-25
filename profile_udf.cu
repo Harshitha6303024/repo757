@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <stdint.h>
-#include "run_udf_divergent.cuh"
+#include "run_udf.cuh"
 
 #define WARP_SIZE 32
 
