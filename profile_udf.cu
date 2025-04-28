@@ -26,13 +26,18 @@ __global__ void profile_udf_kernel(
 }
 
 int main() {
-    const int N = 32; // one warp
-    int h_input[N], h_output[N], h_active_cycles[N];
-    uint64_t h_total_cycles[N];
+    const int N = 1024;   // 32 warps
+    const int threadsPerBlock = 256;
+    const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
+
+    int* h_input = new int[N];
+    int* h_output = new int[N];
+    int* h_active_cycles = new int[N];
+    uint64_t* h_total_cycles = new uint64_t[N];
 
     srand(time(NULL));
     for (int i = 0; i < N; ++i)
-        h_input[i] = rand() % 1000 + 100;  // Induce divergence
+        h_input[i] = rand() % 1000 + 100;  // Input values (100 to 1099)
 
     int *d_input, *d_output, *d_active_cycles;
     uint64_t* d_total_cycles;
@@ -44,7 +49,7 @@ int main() {
 
     cudaMemcpy(d_input, h_input, sizeof(int) * N, cudaMemcpyHostToDevice);
 
-    profile_udf_kernel<<<1, N>>>(d_input, d_output, d_active_cycles, d_total_cycles, N);
+    profile_udf_kernel<<<blocks, threadsPerBlock>>>(d_input, d_output, d_active_cycles, d_total_cycles, N);
     cudaDeviceSynchronize();
 
     cudaMemcpy(h_output, d_output, sizeof(int) * N, cudaMemcpyDeviceToHost);
@@ -58,23 +63,33 @@ int main() {
             max_active = h_active_cycles[i];
     }
 
-    std::cout << "\n=== Per-Thread Execution Report (Integer Work Score) ===\n";
+    std::cout << "\n=== Per-Thread Execution Report (N = 1024 Threads) ===\n";
+    std::cout << "Thread | Input | Output    | Active Cycles | Work Score | Utilization (%)\n";
+    std::cout << "--------------------------------------------------------------------------\n";
+
     for (int i = 0; i < N; ++i) {
         int work_value = h_active_cycles[i]; // Raw active cycles
-        int work_score = (int)(((double)work_value / max_active) * 100.0);  // Score from 0–100
-        double utilization = (double)h_active_cycles[i] / h_total_cycles[i] * 100.0;
+        double work_score = ((double)work_value / max_active) * 100.0;  // Score from 0–100
+        double utilization = ((double)h_active_cycles[i] / (double)h_total_cycles[i]) * 100.0;
 
-        std::cout << "Thread " << std::setw(2) << i
-                  << " | Input: " << std::setw(4) << h_input[i]
-                  << " | Output: " << std::setw(9) << h_output[i]
-                  << " | Work Value: " << std::setw(4) << work_value
-                  << " | Work Score: " << std::setw(3) << work_score << "/100"
-                  << " | Utilization: " << std::fixed << std::setprecision(2) << utilization << " %\n";
+        std::cout << std::setw(6) << i
+                  << " | " << std::setw(5) << h_input[i]
+                  << " | " << std::setw(9) << h_output[i]
+                  << " | " << std::setw(13) << work_value
+                  << " | " << std::fixed << std::setprecision(2) << std::setw(10) << work_score
+                  << " | " << std::fixed << std::setprecision(2) << std::setw(12) << utilization << " %\n";
     }
 
+    // Free memory
     cudaFree(d_input);
     cudaFree(d_output);
     cudaFree(d_active_cycles);
     cudaFree(d_total_cycles);
+
+    delete[] h_input;
+    delete[] h_output;
+    delete[] h_active_cycles;
+    delete[] h_total_cycles;
+
     return 0;
 }
